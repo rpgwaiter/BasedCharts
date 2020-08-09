@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "torrent-box.fullname" . }}
+  labels:
+    {{- include "torrent-box.labels" . | nindent 4 }}
+spec:
+{{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+{{- end }}
+  selector:
+    matchLabels:
+      {{- include "torrent-box.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+    {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      labels:
+        {{- include "torrent-box.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "torrent-box.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+
+      volumes:
+        - name: config
+        {{- if .Values.persistence.dataDir.enabled }}
+          persistentVolumeClaim:
+          {{- if .Values.persistence.dataDir.existingClaim }}
+            claimName: {{ .Values.persistence.dataDir.existingClaim }}
+          {{- else }}
+            claimName: {{ template "torrent-box.fullname" . }}-config
+          {{- end }}
+        {{- else }}
+          emptyDir: {}
+        {{- end }}
+          persistentVolumeClaim:
+            claimName: {{ template "torrent-box.fullname" . }}-config
+        - name: downloads
+          nfs:
+            server: 192.168.1.111
+            path: /mnt/public
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          env:
+            - name: NEW_USER
+              value: {{ .Values.web.user | quote }}
+            - name: NEW_PASS
+              value: {{ .Values.web.pass | quote }}
+            - name: torrent-box_PORT
+              value: {{ .Values.bittorrent.port }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          volumeMounts:
+            - name: config
+              mountPath: /torrent-box
+            - name: downloads
+              mountPath: /torrent-box/downloads
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          {{- if .Values.bittorrent }}
+            - name: bittorrent
+              containerPort: {{ .Values.bittorrent.port }}
+              protocol: TCP
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -1,0 +1,56 @@
+{{- $fullName := include "torrent-box.fullname" . -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullName }}-web
+  labels:
+    {{- include "torrent-box.labels" . | nindent 4 }}
+{{- if .Values.web.annotations }}
+  annotations:
+    {{ toYaml .Values.web.annotations | indent 4 }}
+{{- end }}
+spec:
+{{- if .Values.web.externalTrafficPolicy }}
+  externalTrafficPolicy: {{ .Values.web.externalTrafficPolicy }}
+{{- end }}
+  type: {{  .Values.web.type }}
+{{- if .Values.web.loadBalancerIP }}
+  loadBalancerIP: {{ .Values.web.loadBalancerIP }}
+{{- end }}
+  ports:
+    - port: 80
+      targetPort: 80
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "torrent-box.selectorLabels" . | nindent 4 }}
+
+---
+
+{{- if .Values.bittorrent -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullName }}-bittorrent
+  labels:
+    {{- include "torrent-box.labels" . | nindent 4 }}
+{{- if .Values.bittorrent.annotations }}
+  annotations:
+{{ toYaml .Values.bittorrent.annotations | indent 4 }}
+{{- end }}
+spec:
+{{- if .Values.bittorrent.externalTrafficPolicy }}
+  externalTrafficPolicy: {{ .Values.bittorrent.externalTrafficPolicy }}
+{{- end }}
+  type: {{ .Values.bittorrent.type }}
+{{- if .Values.bittorrent.loadBalancerIP }}
+  loadBalancerIP: {{ .Values.bittorrent.loadBalancerIP }}
+{{- end }}
+  ports:
+    - port: {{ .Values.bittorrent.port }}
+      targetPort: {{ .Values.bittorrent.port }}
+      protocol: TCP
+      name: bittorrent
+  selector:
+    {{- include "torrent-box.selectorLabels" . | nindent 4 }}
+{{- end }}
